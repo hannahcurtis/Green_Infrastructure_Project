@@ -1,0 +1,148 @@
+---
+title: "GAM_clean"
+output: html_document
+date: "2024-09-10"
+---
+
+Load necessary packages and read in dataframes
+```{r}
+library(mgcv)
+library(gamclass)
+library(ggplot2)
+library(randomForest)
+library(car)
+library(mice)
+library(ggcorrplot)
+
+df_all <- read.csv("linear model data_V2_all_impute.csv")
+df_pred_removed <- read.csv("linear model data_V2_predictors_removed_pca.csv")
+df_res_removed <- read.csv("linear model data_V2_res_removed_pca_rf.csv")
+df_subset <- read.csv("lm_data_all_subset_impute.csv")
+df_binomial <- read.csv("linear model data_V2_res_removed_pca_rf_binom.csv")
+```
+
+Correlation Matrix
+```{r}
+corr_all <- cor(df_res_removed[3:43])
+
+# Visualize the correlation matrix using ggcorrplot
+corr_matrix_all <- ggcorrplot(corr_all, 
+           method = "square", 
+           type = "lower", 
+           lab = FALSE,
+           tl.cex = 20           # Adjust text label size on axes
+        +  theme(panel.background = element_rect(fill = "white", color = NA),
+           plot.background = element_rect(fill = "white", color = NA)))
+
+# Customize the axis text size using theme()
+corr_matrix_all <- corr_matrix_all + theme(
+  axis.text.x = element_text(size = 14), # Adjust size for x-axis labels
+  axis.text.y = element_text(size = 14)  # Adjust size for y-axis labels
+)
+
+ggsave("correlation_plot_all.png", width = 15, height = 15)
+
+```
+
+Impute missing data using MICE:
+```{r}
+imputed_data <- mice(df_subset, m = 5, method = "pmm", seed = 123)
+
+#summary(imputed_data)
+
+imputed_df <- complete(imputed_data, 1)
+```
+
+Run random forest model for further variable selection
+```{r}
+#make this example reproducible
+set.seed(1)
+
+#fit the random forest model
+model <- randomForest(
+  formula = Average.infiltration.rate ~ .,
+  data = df_res_removed
+)
+
+#display fitted model
+model
+
+#find number of trees that produce lowest test MSE
+which.min(model$mse)
+
+#find RMSE of best model
+sqrt(model$mse[which.min(model$mse)])
+
+# Predict the response on the training data
+predictions <- predict(model, newdata = df_res_removed)
+
+# Calculate R-squared
+actual_values <- df_res_removed$Average.infiltration.rate
+rss <- sum((actual_values - predictions)^2)  # Residual sum of squares (SSR)
+tss <- sum((actual_values - mean(actual_values))^2)  # Total sum of squares (TSS)
+
+r_squared <- 1 - (rss / tss)
+
+# Print the R-squared value
+print(r_squared)
+
+# plot the test MSE by number of trees
+plot(model)
+
+# produce variable importance plot
+varImpPlot(model, main = "")
+
+```
+
+Check for collinearity using VIF
+```{r}
+#Area+Contributing.Area+Drainage.Area.Ratio+Age+Ponding.Depth+Inlet.Condition+Outlet.Condition+Underdrain+Percent.Residential+Percent.Commercial+Percent.Industrial+ Percent.Institutional+Percent.Vegetation.Shrub+Percent.Vegetation.Tree+Percent.Vegetation.Grass+Percent.Vegetation.Prairie+Percent.Vegetation.Bare+Percent.Vegetation.Other+Underlying.Soil.Percent.Sand+Underlying.Soil.Percent.Silt+Underlying.Soil.Percent.Clay+Underlying.Soil.Percent.Urban.Disturbed+Underlying.Soil.Percent.Other.Undefined+Underlying.Soil.Percent.Organic.Matter+Evidence.of.Poor.Infiltration+Percent.of.Surface.with.Poor.Infiltration+Vegetation.Condition+Inlet.Feature.Curb.Cut+Inlet.Feature.Other+Inlet.Feature.Overland.Flow+Inlet.Feature.Pipe+Outlet.Feature.Other+Outlet.Feature.Overland.Flow+Outlet.Feature.Pipe+Outlet.Feature.Riser.Pipe+Engineered.Soil.Depth+Engineered.Soil.Percent.Sand+Engineered.Soil.Percent.Silt+Engineered.Soil.Percent.Clay+Engineered.Soil.Percent.Compost+Engineered.Soil.Percent.Other
+
+#run lm on dataframe
+vif_model <- lm(Average.infiltration.rate ~ Drainage.Area.Ratio+Age+Ponding.Depth+Percent.Vegetation.Shrub+Percent.Vegetation.Prairie+Percent.Vegetation.Other+Engineered.Soil.Percent.Sand+Engineered.Soil.Percent.Compost+Underlying.Soil.PC.1+Underlying.Soil.PC.2
+, data = df_res_removed)
+
+#create vector of VIF values
+vif_values <- vif(vif_model)
+
+png("VIF.all.png", width = 800, height = 600)
+
+par(mar=c(4,20,4,4))
+
+#create horizontal bar chart to display each VIF value
+barplot(vif_values, horiz = TRUE, cex.names = 1.5, cex.axis = 1.5, las=1, col = "steelblue", main="")
+
+#add vertical lines at 5 and 10
+abline(v = 5, lwd = 2, lty = 2)
+abline(v = 10, lwd = 2, lty = 2)
+
+dev.off()
+```
+
+Run GAM
+```{r}
+#run GAM
+gam_model <- gam(Average.infiltration.rate ~    Drainage.Area.Ratio+s(Age)+s(Percent.Vegetation.Shrub)+s(Percent.Vegetation.Other)+s(Engineered.Soil.Percent.Sand)+Engineered.Soil.Percent.Compost+s(Underlying.Soil.PC.1) + s(Underlying.Soil.PC.2), select=TRUE,  data = df_res_removed)
+
+#Determine if the k values are sufficiently high for the smoothed variables
+#If p-values are significant, k is too low
+gam.check(gam_model)
+
+#Output of model performance (R2, p-values)
+summary(gam_model)
+
+plot(gam_model, all.terms = TRUE, residuals=TRUE, pch=1, cex=1, shade=TRUE, shade.col="lightblue")
+```
+
+Better plot of predicted vs measured
+```{r}
+predictions <- predict(gam_model)
+
+# Make plots square (better to visualize predictions when x and y axes are the same)
+par(pty="s")
+# Plot measured vs predicted
+plot(df_pred_removed$Average.infiltration.rate, predictions, main="",  xlab="Measured Infiltration Rate", ylab="Predicted Infiltration Rate", pch = 16, col = "palegreen2", bg="transparent", cex.axis=1)
+abline(a = 0, b = 1, col = "black")
+grid()
+```
+
