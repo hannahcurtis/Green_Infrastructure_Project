@@ -1,5 +1,8 @@
 # Full GAM Process
 
+library(mgcv)
+library(randomForest)
+
 get_gam <- function(df, num_rf_vars, p_threshold) {
   
 # Random Forest
@@ -8,97 +11,179 @@ get_gam <- function(df, num_rf_vars, p_threshold) {
 set.seed(1)
 
 # Define response variable
-response <- df$Average.infiltration.rate
-
+response <- df_res_removed$Average.infiltration.rate
+  
 # Define predictor variables
 # MANUALLY CHANGE HERE if interested in different predictors
-predictors <- df[, c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Underdrain", "Percent.Vegetation.Shrub", "Percent.Vegetation.Grass", "Percent.Vegetation.Tree", 
-                     "Percent.Vegetation.Prairie", "Percent.Vegetation.Other", "Percent.of.Surface.with.Poor.Infiltration", "Vegetation.Condition", "Engineered.Soil.Depth", 
-                     "Engineered.Soil.Percent.Sand", "Engineered.Soil.Percent.Compost", "Soil_PC_1", "Soil_PC_2", "Percent.Nonresidential")]
-
+predictors <- df_res_removed[, c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Underdrain", "Percent.Vegetation.Shrub", "Percent.Vegetation.Grass", "Percent.Vegetation.Tree", 
+                                  "Percent.Vegetation.Prairie", "Percent.Vegetation.Other", "Percent.of.Surface.with.Poor.Infiltration", "Vegetation.Condition", "Engineered.Soil.Depth", 
+                                  "Engineered.Soil.Percent.Sand", "Engineered.Soil.Percent.Compost", "Soil_PC_1", "Soil_PC_2", "Percent.Nonresidential")]
+  
 rf_df <- data.frame(response, predictors)
-
+  
 #fit the random forest model
-model <- randomForest(
+rf_model <- randomForest(
   formula = response ~ .,
   data = rf_df
 )
-
+  
 #display fitted model
-model
-
+rf_model
+  
 # Predict the response on the training data
-predictions <- predict(model, newdata = df_res_removed)
-
+predictions <- predict(rf_model, newdata = df_res_removed)
+  
 # Calculate R-squared
 actual_values <- response
 rss <- sum((actual_values - predictions)^2)  # Residual sum of squares (SSR)
 tss <- sum((actual_values - mean(actual_values))^2)  # Total sum of squares (TSS)
-
+  
 r_squared <- 1 - (rss / tss)
-
+  
 # Print the R-squared value
 print(r_squared)
-
+  
 # plot the test MSE by number of trees
-plot(model)
-
+plot(rf_model)
+  
 # produce variable importance plot
-varImpPlot(model, main = "")
-
-# Find top 12 variables from model
+varImpPlot(rf_model, main = "")
+  
+# Assume you have already trained your random forest model called 'rf_model'
+# Extract variable importance
+importance_values <- importance(rf_model)
+  
+# Convert to a data frame for easier manipulation
+importance_df <- as.data.frame(importance_values)
+  
+# Get the variable names and their importance scores
+importance_df$Variable <- rownames(importance_df)
+  
+# Sort by importance (you may want to use a specific metric, e.g., Mean Decrease Accuracy)
+importance_df <- importance_df[order(importance_df[, "IncNodePurity"], decreasing = TRUE), ]
+  
+# Select the top 12 variables
 # MANUALLY CHANGE HERE if interested in taking different number of predictors from random forest model
-rf_predictors
+top_vars <- head(importance_df, 12)
+  
+# Create the dataframe with only the variable names
+rf_predictors <- data.frame(Variable = top_vars$Variable)
+
 
 # GAM
 # TO-DO: 
-  # figure out how to smooth non-categorical variables and leave categorical variables as linear
   # figure out what to do if GAM doesn't run due to low edf
-  # figure out how to change vars from smoothed to linear based on edf and rerun model
-  # figure out how to iteratively remove variables whose p-values are greater than 0.2
 
-# run GAM
-gam_model <- gam(response ~ rf_predictors, select = TRUE, data = df)
+# Full list of predictor variables (smooth terms only)
+all_predictors <- c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Percent.Nonresidential", "Percent.Vegetation.Shrub", 
+                    "Percent.Vegetation.Tree", "Percent.Vegetation.Grass", "Percent.Vegetation.Prairie", "Percent.Vegetation.Other", 
+                    "Engineered.Soil.Depth", "Engineered.Soil.Percent.Sand", "Engineered.Soil.Percent.Compost", "Soil_PC_1", "Soil_PC_2")
 
-# Determine if the k values are sufficiently high for the smoothed variables
-# If p-values are significant, k is too low
-gam.check(gam_model)
+# Subsetted predictor variables you want to include in the model
+subsetted_predictors <- rf_predictors
 
-#Output of model performance (R2, edf, p-values)
-gam_summary <- summary(gam_model)
-gam_summary
+# Parametric variables
+initial_parametric_vars <- c("Underdrain", "Vegetation.Condition", "Percent.of.Surface.with.Poor.Infiltration")  # Your fixed parametric terms
 
-# Residuals plots, predicted vs measured plots, plots of each predictor vs response
-plot(gam_model, all.terms = TRUE, residuals=TRUE, pch=1, cex=1, shade=TRUE, shade.col="lightblue")
+# Initialize smooth and parametric terms
+smooth_terms <- setdiff(intersect(all_predictors, subsetted_predictors), initial_parametric_vars)
+parametric_vars <- initial_parametric_vars
 
-# Get list of variables and associated p-values
-# Extract p-values from the smooth terms and parametric terms
-smooth_pvalues <- gam_summary$s.pv   # p-values for smoothed terms
-param_pvalues <- gam_summary$p.pv    # p-values for parametric terms
+# Set up the response variable and threshold for p-value
+response_var <- "Average.infiltration.rate"  # Replace with your response variable
 
-# Combine smooth and parametric terms
-pvalues <- c(smooth_pvalues, param_pvalues)
+# Define the threshold for p-values and the tolerance for EDF comparison
+p_value_threshold <- 0.2
+tolerance <- 1.000001  # Adjust tolerance if necessary
 
-# Extract the names of the predictor variables in the same order
-predictors <- c(rownames(gam_summary$s.table), rownames(gam_summary$p.table))
+# Loop until all terms have p-values below the threshold
+iteration <- 1  # Initialize iteration counter
+while (TRUE) {
+  
+  # Construct the formula with `s()` for smooth terms and linear for parametric terms
+  formula <- as.formula(
+    paste(response_var, "~", 
+          paste(c(paste("s(", smooth_terms, ")", sep=""), parametric_vars), collapse = " + ")
+    )
+  )
+  
+  # Fit the GAM model
+  model <- gam(formula, data = df_res_removed)
+  
+  # Print the current model formula for diagnostics
+  cat("Iteration", iteration, "Model Formula:\n")
+  print(formula)
+  
+  # Get p-values and EDFs for each term
+  summary_model <- summary(model)
+  smooth_p_values <- summary_model$s.table[, "p-value", drop = FALSE]  # p-values for smooth terms
+  smooth_edfs <- summary_model$s.table[, "edf"]         # EDFs for smooth terms
+  parametric_p_values <- summary_model$p.table[, "Pr(>|t|)", drop = FALSE]  # p-values for parametric terms
+  
+  # Display EDF values for debugging
+  cat("EDF values for smooth terms:\n")
+  print(smooth_edfs)
+  
+  # Combine p-values for both smooth and parametric terms
+  all_p_values <- c(smooth_p_values, parametric_p_values)
+  names(all_p_values) <- c(rownames(smooth_p_values), rownames(parametric_p_values))
+  
+  # Check if any p-values are above the threshold
+  if (all(all_p_values < p_value_threshold, na.rm = TRUE)) {
+    cat("All p-values are below the threshold. Ending loop.\n")
+    break  # Exit loop if all terms have p-values below threshold
+  }
+  
+  # Identify smooth terms with EDF ≤ 1
+  low_edf_terms <- names(smooth_edfs[smooth_edfs <=  1.000001])
+  
+  if (length(low_edf_terms) > 0) {
+    cat("Converting the following smooth terms to parametric due to low EDFs:\n", 
+        paste(low_edf_terms, collapse = ", "), "\n")
+    
+    for (term in low_edf_terms) {
+      # Print the term being processed for debugging
+      cat("Processing term for conversion:", term, "\n")
+      
+      # Remove 's()' to get the clean term
+      clean_term <- gsub("^s\\((.*)\\)$", "\\1", term)
+      
+      # Remove the smooth term directly using logical indexing
+      smooth_terms <- smooth_terms[smooth_terms != clean_term]  # Exclude the smooth term
+      
+      # Add to parametric terms
+      parametric_vars <- union(parametric_vars, clean_term)  
+      
+      # Print updated terms for debugging
+      cat("Updated smooth terms:\n", paste(smooth_terms, collapse = ", "), "\n")
+      cat("Updated parametric variables:\n", paste(parametric_vars, collapse = ", "), "\n")
+    }
+  } else {
+    cat("No smooth terms with EDF ≤ 1 found for conversion.\n")
+  }
+  
+  # Find the term with the highest p-value above the threshold
+  max_p_var <- names(all_p_values)[which.max(all_p_values)]
+  max_p_value <- max(all_p_values, na.rm = TRUE)  # Ensure no NA issues
+  
+  cat("Highest p-value term:", max_p_var, "with p-value:", max_p_value, "\n")
+  
+  # If the term with the highest p-value is a smooth term, remove it
+  if (max_p_var %in% rownames(smooth_p_values)) {
+    cat("Removing", max_p_var, "from smooth terms due to high p-value.\n")
+    smooth_terms <- setdiff(smooth_terms, max_p_var)
+  } else {
+    # If it's a parametric term and its p-value is high, remove it
+    cat("Removing", max_p_var, "from parametric terms due to high p-value.\n")
+    parametric_vars <- setdiff(parametric_vars, max_p_var)
+  }
+  
+  # Increment iteration counter for diagnostics
+  iteration <- iteration + 1
+}
 
-# Order the predictors by p-value
-ordered_indices <- order(pvalues)
-ordered_predictors <- predictors[ordered_indices]
-ordered_pvalues <- pvalues[ordered_indices]
-
-# Save the results in a list
-results_list <- list(
-  predictors = ordered_predictors,
-  p_values = ordered_pvalues
-)
-
-# If edf is 1 or below, change variable from smoothed to parameter 
-
-# Rerun GAM until all edf values are above 1
-
-# Remove variable with the largest p-value and rerun
-# Continue removing variables until all variables have p-value less than 0.2
+# View final model summary
+summary(model)
 
 # Create data frame with final predictors
 final_predictors
