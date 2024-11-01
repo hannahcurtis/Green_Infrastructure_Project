@@ -14,14 +14,14 @@ library(car)
 library(mice)
 library(ggcorrplot)
 
-df_all <- read.csv("linear model data_V2_all_impute.csv")
-df_pred_removed <- read.csv("linear model data_V2_predictors_removed_pca.csv")
+#df_all <- read.csv("linear model data_V2_all_impute.csv")
+#df_pred_removed <- read.csv("linear model data_V2_predictors_removed_pca.csv")
 df_res_removed <- read.csv("linear model data_V3_res_removed.csv")
-df_subset <- read.csv("lm_data_all_subset_impute.csv")
-df_binomial <- read.csv("linear model data_V2_res_removed_pca_rf_binom.csv")
+#df_subset <- read.csv("lm_data_all_subset_impute.csv")
+#df_binomial <- read.csv("linear model data_V2_res_removed_pca_rf_binom.csv")
 
-df_underdrain <- read.csv("underdrain_res_removed.csv")
-df_no_underdrain <- read.csv("no_underdrain_res_removed.csv")
+#df_underdrain <- read.csv("underdrain_res_removed.csv")
+#df_no_underdrain <- read.csv("no_underdrain_res_removed.csv")
 ```
 
 Remove random sample (row) from data frame
@@ -359,6 +359,8 @@ while (TRUE) {
 # View final model summary
 summary(model)
 ```
+
+
 ```{r}
 # Fit the GAM model
 model <- gam(formula, data = df_res_removed)
@@ -429,6 +431,8 @@ if (length(low_edf_terms) > 0) {
 smooth_terms
 ```
 
+
+SETUP -- RUN THIS
 ```{r}
 # Full GAM Process
 
@@ -518,23 +522,25 @@ response_var <- "Average.infiltration.rate"  # Replace with your response variab
 p_value_threshold <- 0.2
 tolerance <- 1.000001  # Adjust tolerance if necessary
 
-# Loop until all terms have p-values below the threshold
-iteration <- 1  # Initialize iteration counter
-while (TRUE) {
-  
+run_GAM <- function(smooth_terms, parametric_vars, response_var, data) {
   # Construct the formula with `s()` for smooth terms and linear for parametric terms
   formula <- as.formula(
     paste(response_var, "~", 
           paste(c(paste("s(", smooth_terms, ")", sep=""), parametric_vars), collapse = " + ")
     )
   )
-  
-  # Fit the GAM model
-  model <- gam(formula, data = df_res_removed)
-  
-  # Print the current model formula for diagnostics
-  cat("Iteration", iteration, "Model Formula:\n")
   print(formula)
+
+  return(gam(formula, select=TRUE, data = data))
+}
+```
+
+```{r}
+# Loop until all terms have p-values below the threshold
+iteration <- 1  # Initialize iteration counter
+while (TRUE) {
+  cat("Iteration:", iteration)
+  model <- run_GAM(smooth_terms, parametric_vars, response_var, df_res_removed)
   
   # Get p-values and EDFs for each term
   summary_model <- summary(model)
@@ -593,7 +599,8 @@ while (TRUE) {
   # If the term with the highest p-value is a smooth term, remove it
   if (max_p_var %in% rownames(smooth_p_values)) {
     cat("Removing", max_p_var, "from smooth terms due to high p-value.\n")
-    smooth_terms <- setdiff(smooth_terms, max_p_var)
+    clean_term <- gsub("^s\\((.*)\\)$", "\\1", max_p_var)
+    smooth_terms <- setdiff(smooth_terms, clean_term)
   } else {
     # If it's a parametric term and its p-value is high, remove it
     cat("Removing", max_p_var, "from parametric terms due to high p-value.\n")
@@ -607,6 +614,8 @@ while (TRUE) {
 # View final model summary
 summary(model)
 ```
+
+
 ```{r}
 #get_gam <- function(df, num_rf_vars, p_threshold) {
   
@@ -667,7 +676,7 @@ rf_predictors <- as.list(rf_predictors)
 
 # Full list of predictor variables (smooth terms only)
 all_predictors <- c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Percent.Nonresidential", "Percent.Vegetation.Shrub", 
-                    "Percent.Vegetation.Tree", "Percent.Vegetation.Grass", "Percent.Vegetation.Prairie", "Percent.Vegetation.Other", 
+                    "Percent.Vegetation.Tree", "Percent.Vegetation.Grass", "Percent.Vegetation.Prairie", "Percent.Vegetation.Other",
                     "Engineered.Soil.Depth", "Engineered.Soil.Percent.Sand", "Engineered.Soil.Percent.Compost", "Soil_PC_1", "Soil_PC_2")
 
 # Subsetted predictor variables you want to include in the model
@@ -782,6 +791,8 @@ while (TRUE) {
 summary(model)
 
 ```
+
+
 ```{r}
 #get_gam <- function(df, num_rf_vars, p_threshold) {
   
@@ -842,18 +853,24 @@ initial_parametric_vars <- c("Underdrain", "Vegetation.Condition", "Percent.of.S
 smooth_terms <- intersect(all_predictors, subsetted_predictors)
 parametric_vars <- intersect(initial_parametric_vars, subsetted_predictors)
 
+# Set up the response variable and threshold for p-value
+response_var <- "Average.infiltration.rate"  # Replace with your response variable
 
+# Loop until all terms have p-values below the threshold
+iteration <- 1  # Initialize iteration counter
+while (TRUE) {
+  
   # Construct the formula with `s()` for smooth terms and linear for parametric terms
   if (length(parametric_vars) > 0) {
     formula <- as.formula(
-      paste(response, "~", 
+      paste(response_var, "~", 
             paste(c(paste("s(", smooth_terms, ")", sep=""), parametric_vars), collapse = " + ")
       )
     )
   } else {
     # Only use smooth terms if there are no parametric variables
     formula <- as.formula(
-      paste(response, "~", 
+      paste(response_var, "~", 
             paste(paste("s(", smooth_terms, ")", sep=""), collapse = " + ")
       )
     )
