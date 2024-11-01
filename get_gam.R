@@ -2,117 +2,118 @@
 
 library(mgcv)
 library(randomForest)
+library(visreg)
 
-get_gam <- function(df, num_rf_vars, p_threshold) {
+get_gam <- function(df, x_vars, x_linear, y_var, pca_columns, num_rf_vars, p_threshold) {
+
+# PCA 
   
-# Random Forest
+# Run PCA on columns of interest
+pca_results <- prcomp(pca_columns, scale=TRUE, center=TRUE)
+  
+# Summary of proportion of variance explained for each component 
+print(summary(pca_results))
+  
+# Save first five principal components as variables
+# Can save more components as needed
+first_pc_soil_all <- pca_results$x[, 1]
+second_pc_soil_all <- pca_results$x[, 2]
+third_pc_soil_all <- pca_results$x[, 3]
+fourth_pc_soil_all <- pca_results$x[, 4]
+fifth_pc_soil_all <- pca_results$x[, 5]
+
+# Create a dataframe with first five principal components
+pca_results_df <- data.frame(Soil_PC_1 = first_pc_soil_all, Soil_PC_2 = second_pc_soil_all, 
+                              Soil_PC_3 = third_pc_soil_all, Soil_PC_4 = fourth_pc_soil_all, Soil_PC_5 = fifth_pc_soil_all)
+  
+# Bind the first two principal components to the original data frame
+df <- cbind(df, pca_results_df)
+
+# Randfom Forest
 
 #make this example reproducible
 set.seed(1)
 
 # Define response variable
-response <- df_res_removed$Average.infiltration.rate
-  
-# Define predictor variables
-# MANUALLY CHANGE HERE if interested in different predictors
-predictors <- df_res_removed[, c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Underdrain", "Percent.Vegetation.Shrub", "Percent.Vegetation.Grass", "Percent.Vegetation.Tree", 
-                                  "Percent.Vegetation.Prairie", "Percent.Vegetation.Other", "Percent.of.Surface.with.Poor.Infiltration", "Vegetation.Condition", "Engineered.Soil.Depth", 
-                                  "Engineered.Soil.Percent.Sand", "Engineered.Soil.Percent.Compost", "Soil_PC_1", "Soil_PC_2", "Percent.Nonresidential")]
-  
+response <- y_var
+
+# Define smooth predictor variables
+smooth_predictors <- df[, x_vars]
+
+# Define linear predictor variables
+linear_predictors <- df[, x_linear]
+
+# Combine smooth and linear variables
+predictors <- cbind(smooth_predictors, linear_predictors)
+
+# create data frame of predictor and response variables of interest
 rf_df <- data.frame(response, predictors)
-  
+
 #fit the random forest model
 rf_model <- randomForest(
   formula = response ~ .,
   data = rf_df
 )
-  
+
 #display fitted model
 rf_model
-  
-# Predict the response on the training data
-predictions <- predict(rf_model, newdata = df_res_removed)
-  
-# Calculate R-squared
-actual_values <- response
-rss <- sum((actual_values - predictions)^2)  # Residual sum of squares (SSR)
-tss <- sum((actual_values - mean(actual_values))^2)  # Total sum of squares (TSS)
-  
-r_squared <- 1 - (rss / tss)
-  
-# Print the R-squared value
-print(r_squared)
-  
+
 # plot the test MSE by number of trees
 plot(rf_model)
-  
+
 # produce variable importance plot
 varImpPlot(rf_model, main = "")
-  
-# Assume you have already trained your random forest model called 'rf_model'
-# Extract variable importance
-importance_values <- importance(rf_model)
-  
-# Convert to a data frame for easier manipulation
-importance_df <- as.data.frame(importance_values)
-  
-# Get the variable names and their importance scores
-importance_df$Variable <- rownames(importance_df)
-  
-# Sort by importance (you may want to use a specific metric, e.g., Mean Decrease Accuracy)
-importance_df <- importance_df[order(importance_df[, "IncNodePurity"], decreasing = TRUE), ]
-  
-# Select the top 12 variables
-# MANUALLY CHANGE HERE if interested in taking different number of predictors from random forest model
-top_vars <- head(importance_df, 12)
-  
-# Create the dataframe with only the variable names
-rf_predictors <- data.frame(Variable = top_vars$Variable)
 
+# Determine most important x variables
+importance_values <- importance(rf_model)  # Get importance values
+top_vars <- head(order(importance_values[, "IncNodePurity"], decreasing = TRUE), num_rf_vars)  # Get indices of top x variables
+
+# Get the names of the top x variables
+rf_predictors <- rownames(importance_values)[top_vars]
+
+# Convert variables to a list
+rf_predictors <- as.list(rf_predictors)
 
 # GAM
-# TO-DO: 
-  # figure out what to do if GAM doesn't run due to low edf
 
-# Full list of predictor variables (smooth terms only)
-all_predictors <- c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Percent.Nonresidential", "Percent.Vegetation.Shrub", 
-                    "Percent.Vegetation.Tree", "Percent.Vegetation.Grass", "Percent.Vegetation.Prairie", "Percent.Vegetation.Other", 
-                    "Engineered.Soil.Depth", "Engineered.Soil.Percent.Sand", "Engineered.Soil.Percent.Compost", "Soil_PC_1", "Soil_PC_2")
-
-# Subsetted predictor variables you want to include in the model
+# Subsetted predictor variables to include in the model from random forest
 subsetted_predictors <- rf_predictors
 
+# Full list of predictor smoothed predictor variables 
+all_predictors <- x_vars
+
 # Parametric variables
-initial_parametric_vars <- c("Underdrain", "Vegetation.Condition", "Percent.of.Surface.with.Poor.Infiltration")  # Your fixed parametric terms
+initial_parametric_vars <- x_linear  # Your fixed parametric terms
 
-# Initialize smooth and parametric terms
-smooth_terms <- setdiff(intersect(all_predictors, subsetted_predictors), initial_parametric_vars)
-parametric_vars <- initial_parametric_vars
+# Initialize smooth and parametric terms from overlap of rf vars and all vars of interest
+smooth_terms <- intersect(all_predictors, subsetted_predictors)
+parametric_vars <- intersect(initial_parametric_vars, subsetted_predictors)
 
-# Set up the response variable and threshold for p-value
-response_var <- "Average.infiltration.rate"  # Replace with your response variable
+# Define the response variable
+response_var <- "y_var" 
 
 # Define the threshold for p-values and the tolerance for EDF comparison
-p_value_threshold <- 0.2
+p_value_threshold <- p_threshold
 tolerance <- 1.000001  # Adjust tolerance if necessary
 
-# Loop until all terms have p-values below the threshold
-iteration <- 1  # Initialize iteration counter
-while (TRUE) {
-  
+run_GAM <- function(smooth_terms, parametric_vars, response_var, data) {
   # Construct the formula with `s()` for smooth terms and linear for parametric terms
   formula <- as.formula(
     paste(response_var, "~", 
           paste(c(paste("s(", smooth_terms, ")", sep=""), parametric_vars), collapse = " + ")
     )
   )
-  
-  # Fit the GAM model
-  model <- gam(formula, data = df_res_removed)
-  
-  # Print the current model formula for diagnostics
-  cat("Iteration", iteration, "Model Formula:\n")
+  # Print model formula
   print(formula)
+  
+  return(gam(formula, select=TRUE, data = df))
+}
+
+# Loop until all terms have p-values below the threshold
+iteration <- 1  # Initialize iteration counter
+while (TRUE) {
+  cat("Iteration:", iteration) # display iteration number
+  model <- run_GAM(smooth_terms, parametric_vars, response_var, df) # run GAM
   
   # Get p-values and EDFs for each term
   summary_model <- summary(model)
@@ -145,7 +146,7 @@ while (TRUE) {
       # Print the term being processed for debugging
       cat("Processing term for conversion:", term, "\n")
       
-      # Remove 's()' to get the clean term
+      # Remove 's()' to convert term from smooth to linear
       clean_term <- gsub("^s\\((.*)\\)$", "\\1", term)
       
       # Remove the smooth term directly using logical indexing
@@ -171,7 +172,8 @@ while (TRUE) {
   # If the term with the highest p-value is a smooth term, remove it
   if (max_p_var %in% rownames(smooth_p_values)) {
     cat("Removing", max_p_var, "from smooth terms due to high p-value.\n")
-    smooth_terms <- setdiff(smooth_terms, max_p_var)
+    clean_term <- gsub("^s\\((.*)\\)$", "\\1", max_p_var)
+    smooth_terms <- setdiff(smooth_terms, clean_term)
   } else {
     # If it's a parametric term and its p-value is high, remove it
     cat("Removing", max_p_var, "from parametric terms due to high p-value.\n")
@@ -182,30 +184,41 @@ while (TRUE) {
   iteration <- iteration + 1
 }
 
-# View final model summary
-summary(model)
+# After your loop
+y_var <- df$Average.infiltration.rate
 
-# Create data frame with final predictors
-final_predictors
+# view model check
+print(gam.check(model))
 
-# Check and plot VIF
-#run lm on dataframe
-vif_model <- lm(response ~ final_predictors, data = df)
+# view final model summary
+print(summary(model))
 
-# create vector of VIF values
+# Now use y_var in your analysis or plotting functions
+#visreg(model, "parametric_variable_name", y_var = y_var)
+
+# Save the final smooth and parametric terms as a character vector
+final_terms <- c(smooth_terms, parametric_vars)
+
+# Create a formula for the VIF model
+formula_string <- paste("response ~", paste(final_terms, collapse = " + "))
+
+# Run the lm model using the constructed formula
+vif_model <- lm(as.formula(formula_string), data = df)
+
+# Create vector of VIF values
 vif_values <- vif(vif_model)
 
-# Increase margin size so variable names all show up
-par(mar=c(4,20,4,4))
+# widen plot so variable names aren't cut off
+par(mar=c(4,25,4,4))
 
-# create horizontal bar chart to display each VIF value
+#create horizontal bar chart to display each VIF value
 barplot(vif_values, horiz = TRUE, cex.names = 1.5, cex.axis = 1.5, las=1, col = "steelblue", main="")
 
-# add vertical lines at 5 and 10
+#add vertical lines at 5 and 10 (considered high VIF score if above)
 abline(v = 5, lwd = 2, lty = 2)
 abline(v = 10, lwd = 2, lty = 2)
 
 # Check concurvity
-concurvity(gam_model, full=TRUE)
+print(concurvity(model, full=TRUE))
 
 }

@@ -1,0 +1,61 @@
+---
+title: "GAM_template"
+output: html_document
+date: "2024-11-01"
+---
+
+Read in files
+```{r}
+# Dataset with all samples, engineered soil variables removed (n=182)
+df_all <- read.csv("model data_V3_engsoil_removed_pca.csv") # Change file path as needed
+
+# Dataset with samples with NA engineered soil variables removed (n-102)
+df_res_removed <- read.csv("linear model data_V3_res_removed.csv") # Change file path as needed
+```
+
+How to run PCA of underlying soil vars if interested
+```{r}
+# Run PCA on columns of interest
+pca_soil_all <- prcomp(df_all[21:26], scale=TRUE, center=TRUE) # Change column numbers as needed
+
+# Summary of proportion of variance explained for each component 
+summary(pca_soil_all)
+
+# Save first two principal components as variables
+# Can save more components as needed
+first_pc_soil_all <- pca_soil_all$x[, 1]
+second_pc_soil_all <- pca_soil_all$x[, 2]
+
+# Create a dataframe with first two principal components
+pca_soil_all_df <- data.frame(Soil_PC_1 = first_pc_soil_all, Soil_PC_2 = second_pc_soil_all)
+
+# Bind the first two principal components to the original data frame
+df_all <- cbind(df_all, pca_soil_all_df)
+
+# Write a csv file for the new data frame with the principal components added 
+write.csv(df_all, file = "model data_V3_engsoil_removed_pca.csv")
+```
+
+
+```{r}
+# Calls GAM script
+source("get_gam.R")
+
+# Define predictor variables that will initially be smoothed
+# Make sure variable names matches names in csv exactly
+x <- c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Percent.Nonresidential", "Percent.Vegetation.Shrub",
+                "Percent.Vegetation.Tree", "Percent.Vegetation.Grass", "Percent.Vegetation.Prairie", "Percent.Vegetation.Other",
+                "Engineered.Soil.Depth", "Engineered.Soil.Percent.Sand", "Engineered.Soil.Percent.Compost", "Soil_PC_1", "Soil_PC_2")
+
+# Define linear predictor variables
+# Make sure variable names matches names in csv exactly
+x_lin <- c("Underdrain", "Vegetation.Condition", "Percent.of.Surface.with.Poor.Infiltration")
+
+# Define response variable
+# Make sure data frame matches the data frame you're using in the get_gam function
+y <- df_res_removed$Average.infiltration.rate
+
+# Call GAM function and enter data frame, smoothed x vars, linear x vars, # RF variables, and p-value threshold of interest
+get_gam(df_res_removed, x, x_lin, y, 12, 0.2)
+```
+
