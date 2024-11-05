@@ -18,7 +18,7 @@ library(visreg)
 df_all <- read.csv("model data_V3_engsoil_removed.csv")
 #df_pred_removed <- read.csv("linear model data_V2_predictors_removed_pca.csv")
 df_res_removed <- read.csv("linear model data_V3_res_removed.csv")
-#df_subset <- read.csv("lm_data_all_subset_impute.csv")
+df_subset <- read.csv("model data_V3_inf_subset.csv")
 #df_binomial <- read.csv("linear model data_V2_res_removed_pca_rf_binom.csv")
 
 #df_underdrain <- read.csv("underdrain_res_removed.csv")
@@ -27,16 +27,16 @@ df_res_removed <- read.csv("linear model data_V3_res_removed.csv")
 
 PCA of underlying soil vars
 ```{r}
-pca_soil_all <- prcomp(df_all[21:26], scale=TRUE, center=TRUE)
+pca_soil_all <- prcomp(df_subset[21:26], scale=TRUE, center=TRUE)
 summary(pca_soil_all)
 first_pc_soil_all <- pca_soil_all$x[, 1]
 second_pc_soil_all <- pca_soil_all$x[, 2]
 
 pca_soil_all_df <- data.frame(Soil_PC_1 = first_pc_soil_all, Soil_PC_2 = second_pc_soil_all)
 
-df_all <- cbind(df_all, pca_soil_all_df)
+#df_all <- cbind(df_all, pca_soil_all_df)
 
-write.csv(df_all, file = "model data_V3_engsoil_removed_pca.csv")
+write.csv(pca_soil_all_df, file = "model data_V3_subset_engvars_pca.csv")
 ```
 
 Remove random sample (row) from data frame
@@ -183,10 +183,9 @@ df_res_removed$Inf.High.Low.6 <- as.factor(df_res_removed$Inf.High.Low.6)
 
 
 #run GAM
-gam_model <- gam(Average.infiltration.rate ~ Drainage.Area.Ratio + s(Age) + s(Percent.Vegetation.Shrub) + s(Percent.Vegetation.Other) + Engineered.Soil.Percent.Sand + s(Soil_PC_1) + s(Soil_PC_2) + Engineered.Soil.Percent.Compost 
-
-
-
+gam_model <- gam(Average.infiltration.rate ~  s(Drainage.Area.Ratio) + s(Age) + s(Ponding.Depth) + Percent.Nonresidential + s(Percent.Vegetation.Shrub) +
+                 s(Percent.Vegetation.Tree) + Percent.Vegetation.Grass + s(Percent.Vegetation.Prairie) + Percent.Vegetation.Other +
+                 s(Engineered.Soil.Depth) + s(Engineered.Soil.Percent.Sand) + Engineered.Soil.Percent.Compost + s(Soil_PC_1) + s(Soil_PC_2) + Underdrain  + Percent.of.Surface.with.Poor.Infiltration
 , select = TRUE, data = df_res_removed)
 
 #Determine if the k values are sufficiently high for the smoothed variables
@@ -271,24 +270,24 @@ source("get_gam.R")
 #                 "Percent.Vegetation.Tree", "Percent.Vegetation.Grass", "Percent.Vegetation.Prairie", "Percent.Vegetation.Other",
 #                 "Engineered.Soil.Depth", "Engineered.Soil.Percent.Sand", "Engineered.Soil.Percent.Compost", "Soil_PC_1", "Soil_PC_2")
 
-# x <- c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Percent.Nonresidential", "Percent.Vegetation.Shrub",
-#                      "Percent.Vegetation.Tree", "Percent.Vegetation.Grass", "Percent.Vegetation.Prairie", "Percent.Vegetation.Other",
-#                      "Soil_PC_1", "Soil_PC_2")
-
 x <- c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Percent.Nonresidential", "Percent.Vegetation.Shrub",
                      "Percent.Vegetation.Tree", "Percent.Vegetation.Grass", "Percent.Vegetation.Prairie", "Percent.Vegetation.Other",
-                     "Underlying.Soil.Percent.Sand", "Underlying.Soil.Percent.Silt", "Underlying.Soil.Percent.Clay", 
-                     "Underlying.Soil.Percent.Urban.Disturbed", "Underlying.Soil.Percent.Other.Undefined",
-                     "Underlying.Soil.Percent.Organic.Matter", "Engineered.Soil.Depth", "Engineered.Soil.Percent.Sand",
-                     "Engineered.Soil.Percent.Compost")
+                     "Soil_PC_1", "Soil_PC_2")
+
+# x <- c("Drainage.Area.Ratio", "Age", "Ponding.Depth", "Percent.Nonresidential", "Percent.Vegetation.Shrub",
+#                      "Percent.Vegetation.Tree", "Percent.Vegetation.Grass", "Percent.Vegetation.Prairie", "Percent.Vegetation.Other",
+#                      "Underlying.Soil.Percent.Sand", "Underlying.Soil.Percent.Silt", "Underlying.Soil.Percent.Clay", 
+#                      "Underlying.Soil.Percent.Urban.Disturbed", "Underlying.Soil.Percent.Other.Undefined",
+#                      "Underlying.Soil.Percent.Organic.Matter", "Engineered.Soil.Depth", "Engineered.Soil.Percent.Sand",
+#                      "Engineered.Soil.Percent.Compost")
 
 x_lin <- c("Underdrain", "Vegetation.Condition", "Percent.of.Surface.with.Poor.Infiltration")
 
-y <- df_res_removed$Average.infiltration.rate
+y <- df_all$Average.infiltration.rate
 
-columns <- df_res_removed[21:26]
+columns <- df_all[22:27]
 
-get_gam(df_res_removed, x, x_lin, y, columns, 12, 0.2)
+get_gam(df_all, x, x_lin, y, columns, 12, 0.2)
 ```
 ```{r}
 # Load the final model from the RDS file
