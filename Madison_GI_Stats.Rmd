@@ -1,0 +1,398 @@
+---
+title: "Madison_GI_Stats"
+output: html_document
+date: "2025-03-19"
+---
+
+To DO:
+
+-Write function in each code block
+-In ANCOVA functions, return data frame with site, slope p, slope sig (yes/no), intercept p, intercept sig (yes/no)
+-Create table outputs
+-Look into 2 way ANOVA
+-Run all years in one ANCOVA
+
+Read in data file
+```{r}
+# change path/file name as necessary 
+# skips first row
+gi_data <- read.csv("Madison_GI_all.csv", skip = 1)
+gi_df <- data.frame(gi_data)
+```
+
+Convert values to natural log
+```{r}
+# Volumes
+ln_seg_vol <- log(as.numeric(gi_df$Segoe.AV))
+ln_west_vol <- log(as.numeric(gi_df$Westmorland.AV))
+ln_glen_vol <- log(as.numeric(gi_df$Glen.AV))
+ln_greg_vol <- log(as.numeric(gi_df$Gregory.AV))
+
+# Peak Q
+ln_seg_q <- log(as.numeric(gi_df$Segoe.AV.2))
+ln_west_q <- log(as.numeric(gi_df$Westmorland.AV.2))
+ln_glen_q <- log(as.numeric(gi_df$Glen.AV.2))
+ln_greg_q <- log(as.numeric(gi_df$Gregory..AV))
+```
+
+Add ln values to data frame
+```{r}
+gi_df_ln <- cbind(gi_df, ln_seg_vol, ln_west_vol, ln_glen_vol, ln_greg_vol, ln_seg_q, ln_west_q, ln_glen_q, ln_greg_q)
+```
+
+Linear Regressions
+```{r}
+# Glen
+
+# 2020
+lm_glen_20 <- lm(ln_glen_vol[1:42] ~ ln_seg_vol[1:42], data = gi_df_ln)
+# 2021
+lm_glen_21 <- lm(ln_glen_vol[43:84] ~ ln_seg_vol[43:84], data = gi_df_ln)
+# 2022
+lm_glen_22 <- lm(ln_glen_vol[85:126] ~ ln_seg_vol[85:126], data = gi_df_ln)
+# 2023
+lm_glen_23 <- lm(ln_glen_vol[127:207] ~ ln_seg_vol[127:207], data = gi_df_ln)
+
+# Plot
+# 2020
+par(mar = c(4,4,4,1)) # bottom, left, top, right
+plot(ln_seg_vol[1:42], ln_glen_vol[1:42], pch=19, col="red", main="Regression of Glen by Segoe", ylab="Glen", xlab="Segoe", ylim=c(0,14), xlim=c(4,13))
+# 2021
+points(ln_seg_vol[43:84], ln_glen_vol[43:84], pch=19, col="dodgerblue3")
+# 2022
+points(ln_seg_vol[85:126], ln_glen_vol[85:126], pch=19, col="limegreen")
+# 2023
+points(ln_seg_vol[127:207], ln_glen_vol[127:207], pch=19, col="gold")
+# Regression line 2020
+abline(lm_glen_20, lwd=2, col="red")
+# Regression line 2021
+abline(lm_glen_21, lwd=2, col="dodgerblue3")
+# Regression line 2022
+abline(lm_glen_22, lwd=2, col="limegreen")
+# Regression line 2023
+abline(lm_glen_23, lwd=2, col="gold")
+grid()
+leg.txt <- c("2020", "2021", "2022", "2023")
+legend("bottomright", leg.txt, pch=19, col=c("red", "dodgerblue3", "limegreen", "gold"), horiz=TRUE)
+
+# Westmorland
+
+# 2020
+lm_west_20 <- lm(ln_west_vol[1:42] ~ ln_seg_vol[1:42], data = gi_df_ln)
+# 2021
+lm_west_21 <- lm(ln_west_vol[43:84] ~ ln_seg_vol[43:84], data = gi_df_ln)
+# 2022
+lm_west_22 <- lm(ln_west_vol[85:126] ~ ln_seg_vol[85:126], data = gi_df_ln)
+# 2023
+lm_west_23 <- lm(ln_west_vol[127:207] ~ ln_seg_vol[127:207], data = gi_df_ln)
+
+# Plot
+# 2020
+par(mar = c(4,4,4,1)) # bottom, left, top, right
+plot(ln_seg_vol[1:42], ln_west_vol[1:42], pch=19, col="red", main="Regression of Westmorland by Segoe", ylab="Westmorland", xlab="Segoe", ylim=c(0,14), xlim=c(4,13))
+# 2021
+points(ln_seg_vol[43:84], ln_west_vol[43:84], pch=19, col="dodgerblue3")
+# 2022
+points(ln_seg_vol[85:126], ln_west_vol[85:126], pch=19, col="limegreen")
+# 2023
+points(ln_seg_vol[127:207], ln_west_vol[127:207], pch=19, col="gold")
+# Regression line 2020
+abline(lm_west_20, lwd=2, col="red")
+# Regression line 2021
+abline(lm_west_21, lwd=2, col="dodgerblue3")
+# Regression line 2022
+abline(lm_west_22, lwd=2, col="limegreen")
+# Regression line 2023
+abline(lm_west_23, lwd=2, col="gold")
+grid()
+leg.txt <- c("2020", "2021", "2022", "2023")
+legend("bottomright", leg.txt, pch=19, col=c("red", "dodgerblue3", "limegreen", "gold"), horiz=TRUE)
+
+# Gregory
+
+# 2020
+lm_greg_20 <- lm(ln_greg_vol[1:42] ~ ln_seg_vol[1:42], data = gi_df_ln)
+# 2021
+lm_greg_21 <- lm(ln_greg_vol[43:84] ~ ln_seg_vol[43:84], data = gi_df_ln)
+# 2022
+lm_greg_22 <- lm(ln_greg_vol[85:126] ~ ln_seg_vol[85:126], data = gi_df_ln)
+# 2023
+lm_greg_23 <- lm(ln_greg_vol[127:207] ~ ln_seg_vol[127:207], data = gi_df_ln)
+
+# Plot
+# 2020
+par(mar = c(4,4,4,1)) # bottom, left, top, right
+plot(ln_seg_vol[1:42], ln_greg_vol[1:42], pch=19, col="red", main="Regression of Gregory by Segoe", ylab="Gregory", xlab="Segoe", ylim=c(0,14), xlim=c(4,13))
+# 2021
+points(ln_seg_vol[43:84], ln_greg_vol[43:84], pch=19, col="dodgerblue3")
+# 2022
+points(ln_seg_vol[85:126], ln_greg_vol[85:126], pch=19, col="limegreen")
+# 2023
+points(ln_seg_vol[127:207], ln_greg_vol[127:207], pch=19, col="gold")
+# Regression line 2020
+abline(lm_greg_20, lwd=2, col="red")
+# Regression line 2021
+abline(lm_greg_21, lwd=2, col="dodgerblue3")
+# Regression line 2022
+abline(lm_greg_22, lwd=2, col="limegreen")
+# Regression line 2023
+abline(lm_greg_23, lwd=2, col="gold")
+grid()
+leg.txt <- c("2020", "2021", "2022", "2023")
+legend("bottomright", leg.txt, pch=19, col=c("red", "dodgerblue3", "limegreen", "gold"), horiz=TRUE)
+
+```
+
+Get % Differences
+```{r}
+# Glen
+
+# 2020/2021
+glen_20_21_pred_ln <- lm_glen_20$coefficients[2]*gi_df_ln$ln_seg_vol[43:84] + lm_glen_20$coefficients[1]
+glen_20_21_pred <- exp(glen_20_21_pred_ln)
+
+glen_diff_20_21 <- (mean(gi_df_ln$Glen.AV[43:84]) - mean(glen_20_21_pred))/mean(glen_20_21_pred)
+
+# 2020/2022
+glen_20_22_pred_ln <- lm_glen_20$coefficients[2]*gi_df_ln$ln_seg_vol[85:126] + lm_glen_20$coefficients[1]
+glen_20_22_pred <- exp(glen_20_22_pred_ln)
+
+glen_diff_20_22 <- (mean(gi_df_ln$Glen.AV[85:126]) - mean(glen_20_22_pred))/mean(glen_20_22_pred)
+
+# 2020/2023
+glen_20_23_pred_ln <- lm_glen_20$coefficients[2]*gi_df_ln$ln_seg_vol[127:207] + lm_glen_20$coefficients[1]
+glen_20_23_pred <- exp(glen_20_23_pred_ln)
+
+glen_diff_20_23 <- (mean(gi_df_ln$Glen.AV[127:207]) - mean(glen_20_23_pred))/mean(glen_20_23_pred)
+
+# 2021/2022
+glen_21_22_pred_ln <- lm_glen_21$coefficients[2]*gi_df_ln$ln_seg_vol[85:126] + lm_glen_21$coefficients[1]
+glen_21_22_pred <- exp(glen_21_22_pred_ln)
+
+glen_diff_21_22 <- (mean(gi_df_ln$Glen.AV[85:126]) - mean(glen_21_22_pred))/mean(glen_21_22_pred)
+
+# 2021/2023
+glen_21_23_pred_ln <- lm_glen_21$coefficients[2]*gi_df_ln$ln_seg_vol[127:207] + lm_glen_21$coefficients[1]
+glen_21_23_pred <- exp(glen_21_23_pred_ln)
+
+glen_diff_21_23 <- (mean(gi_df_ln$Glen.AV[127:207]) - mean(glen_21_23_pred))/mean(glen_21_23_pred)
+
+# 2022/2023
+glen_22_23_pred_ln <- lm_glen_22$coefficients[2]*gi_df_ln$ln_seg_vol[127:207] + lm_glen_22$coefficients[1]
+glen_22_23_pred <- exp(glen_22_23_pred_ln)
+
+glen_diff_22_23 <- (mean(gi_df_ln$Glen.AV[127:207]) - mean(glen_22_23_pred))/mean(glen_22_23_pred)
+
+# Westmorland
+
+# 2020/2021
+west_20_21_pred_ln <- lm_west_20$coefficients[2]*gi_df_ln$ln_seg_vol[43:84] + lm_west_20$coefficients[1]
+west_20_21_pred <- exp(west_20_21_pred_ln)
+
+west_diff_20_21 <- (mean(gi_df_ln$Westmorland.AV[43:84]) - mean(west_20_21_pred))/mean(west_20_21_pred)
+
+# 2020/2022
+west_20_22_pred_ln <- lm_west_20$coefficients[2]*gi_df_ln$ln_seg_vol[85:126] + lm_west_20$coefficients[1]
+west_20_22_pred <- exp(west_20_22_pred_ln)
+
+west_diff_20_22 <- (mean(gi_df_ln$Westmorland.AV[85:126]) - mean(west_20_22_pred))/mean(west_20_22_pred)
+
+# 2020/2023
+west_20_23_pred_ln <- lm_west_20$coefficients[2]*gi_df_ln$ln_seg_vol[127:207] + lm_west_20$coefficients[1]
+west_20_23_pred <- exp(west_20_23_pred_ln)
+
+west_diff_20_23 <- (mean(gi_df_ln$Westmorland.AV[127:207]) - mean(west_20_23_pred))/mean(west_20_23_pred)
+
+# 2021/2022
+west_21_22_pred_ln <- lm_west_21$coefficients[2]*gi_df_ln$ln_seg_vol[85:126] + lm_west_21$coefficients[1]
+west_21_22_pred <- exp(west_21_22_pred_ln)
+
+west_diff_21_22 <- (mean(gi_df_ln$Westmorland.AV[85:126]) - mean(west_21_22_pred))/mean(west_21_22_pred)
+
+# 2021/2023
+west_21_23_pred_ln <- lm_west_21$coefficients[2]*gi_df_ln$ln_seg_vol[127:207] + lm_west_21$coefficients[1]
+west_21_23_pred <- exp(west_21_23_pred_ln)
+
+west_diff_21_23 <- (mean(gi_df_ln$Westmorland.AV[127:207]) - mean(west_21_23_pred))/mean(west_21_23_pred)
+
+# 2022/2023
+west_22_23_pred_ln <- lm_west_22$coefficients[2]*gi_df_ln$ln_seg_vol[127:207] + lm_west_22$coefficients[1]
+west_22_23_pred <- exp(west_22_23_pred_ln)
+
+west_diff_22_23 <- (mean(gi_df_ln$Westmorland.AV[127:207]) - mean(west_22_23_pred))/mean(west_22_23_pred)
+
+# Gregory
+
+# 2020/2021
+greg_20_21_pred_ln <- lm_greg_20$coefficients[2]*gi_df_ln$ln_seg_vol[43:84] + lm_greg_20$coefficients[1]
+greg_20_21_pred <- exp(greg_20_21_pred_ln)
+
+greg_diff_20_21 <- (mean(gi_df_ln$Gregory.AV[43:84]) - mean(greg_20_21_pred))/mean(greg_20_21_pred)
+
+# 2020/2022
+greg_20_22_pred_ln <- lm_greg_20$coefficients[2]*gi_df_ln$ln_seg_vol[85:126] + lm_greg_20$coefficients[1]
+greg_20_22_pred <- exp(greg_20_22_pred_ln)
+
+greg_diff_20_22 <- (mean(gi_df_ln$Gregory.AV[85:126]) - mean(greg_20_22_pred))/mean(greg_20_22_pred)
+
+# 2020/2023
+greg_20_23_pred_ln <- lm_greg_20$coefficients[2]*gi_df_ln$ln_seg_vol[127:207] + lm_greg_20$coefficients[1]
+greg_20_23_pred <- exp(greg_20_23_pred_ln)
+
+greg_diff_20_23 <- (mean(gi_df_ln$Gregory.AV[127:207]) - mean(greg_20_23_pred))/mean(greg_20_23_pred)
+
+# 2021/2022
+greg_21_22_pred_ln <- lm_greg_21$coefficients[2]*gi_df_ln$ln_seg_vol[85:126] + lm_greg_21$coefficients[1]
+greg_21_22_pred <- exp(greg_21_22_pred_ln)
+
+greg_diff_21_22 <- (mean(gi_df_ln$Gregory.AV[85:126]) - mean(greg_21_22_pred))/mean(greg_21_22_pred)
+
+# 2021/2023
+greg_21_23_pred_ln <- lm_greg_21$coefficients[2]*gi_df_ln$ln_seg_vol[127:207] + lm_greg_21$coefficients[1]
+greg_21_23_pred <- exp(greg_21_23_pred_ln)
+
+greg_diff_21_23 <- (mean(gi_df_ln$Gregory.AV[127:207]) - mean(greg_21_23_pred))/mean(greg_21_23_pred)
+
+# 2022/2023
+greg_22_23_pred_ln <- lm_greg_22$coefficients[2]*gi_df_ln$ln_seg_vol[127:207] + lm_greg_22$coefficients[1]
+greg_22_23_pred <- exp(greg_22_23_pred_ln)
+
+greg_diff_22_23 <- (mean(gi_df_ln$Gregory.AV[127:207]) - mean(greg_22_23_pred))/mean(greg_22_23_pred)
+```
+
+ANCOVA Glen
+```{r}
+# 2020/2021
+ancova_glen_20_21 <- aov(ln_glen_vol[1:84] ~ as.factor(Year[1:84]) * ln_seg_vol[1:84] , data = gi_df_ln)
+Anova(ancova_glen_20_21, type="III")
+
+# anova_glen_20_21 <- aov(ln_glen_vol[1:84] ~ as.factor(Year[1:84]), data = gi_df_ln)
+# summary(anova_glen_20_21)
+
+TukeyHSD(ancova_glen_20_21, conf.level=0.9)
+
+# 2020/2022
+ancova_glen_20_22 <- aov(ln_glen_vol[c(1:42, 85:126)] ~ as.factor(Year[c(1:42, 85:126)]) * ln_seg_vol[c(1:42, 85:126)] , data = gi_df_ln)
+Anova(ancova_glen_20_22, type="II")
+
+TukeyHSD(ancova_glen_20_22, conf.level=0.9)
+
+# 2020/2023
+ancova_glen_20_23 <- aov(ln_glen_vol[c(1:42, 127:207)] ~ as.factor(Year[c(1:42, 127:207)]) * ln_seg_vol[c(1:42, 127:207)] , data = gi_df_ln)
+Anova(ancova_glen_20_23, type="II")
+
+TukeyHSD(ancova_glen_20_23, "Year", conf.level=0.9)
+
+# 2021/2022
+ancova_glen_21_22 <- aov(ln_glen_vol[43:126] ~ as.factor(Year[43:126]) * ln_seg_vol[43:126] , data = gi_df_ln)
+Anova(ancova_glen_21_22, type="II")
+
+TukeyHSD(ancova_glen_21_22, conf.level=0.9)
+
+# 2021/2023
+ancova_glen_21_23 <- aov(ln_glen_vol[c(43:84, 127:207)] ~ as.factor(Year[c(43:84, 127:207)]) * ln_seg_vol[c(43:84, 127:207)] , data = gi_df_ln)
+Anova(ancova_glen_21_23, type="II")
+
+TukeyHSD(ancova_glen_21_23, "Year", conf.level=0.9)
+
+# 2022/2023
+ancova_glen_22_23 <- aov(ln_glen_vol[85:207] ~ as.factor(Year[85:207]) * ln_seg_vol[85:207] , data = gi_df_ln)
+Anova(ancova_glen_22_23, type="II")
+
+TukeyHSD(ancova_glen_22_23, "Year", conf.level=0.9)
+
+```
+
+ANCOVA Westmorland
+```{r}
+# 2020/2021
+ancova_west_20_21 <- aov(ln_west_vol[1:84] ~ as.factor(Year[1:84]) * ln_seg_vol[1:84] , data = gi_df_ln)
+Anova(ancova_west_20_21, type="III")
+
+# anova_west_20_21 <- aov(ln_west_vol[1:84] ~ as.factor(Year[1:84]), data = gi_df_ln)
+# summary(anova_west_20_21)
+
+TukeyHSD(ancova_west_20_21, conf.level=0.9)
+
+# 2020/2022
+ancova_west_20_22 <- aov(ln_west_vol[c(1:42, 85:126)] ~ as.factor(Year[c(1:42, 85:126)]) * ln_seg_vol[c(1:42, 85:126)] , data = gi_df_ln)
+Anova(ancova_west_20_22, type="II")
+
+TukeyHSD(ancova_west_20_22, conf.level=0.9)
+
+# 2020/2023
+ancova_west_20_23 <- aov(ln_west_vol[c(1:42, 127:207)] ~ as.factor(Year[c(1:42, 127:207)]) * ln_seg_vol[c(1:42, 127:207)] , data = gi_df_ln)
+Anova(ancova_west_20_23, type="II")
+
+TukeyHSD(ancova_west_20_23, "Year", conf.level=0.9)
+
+# 2021/2022
+ancova_west_21_22 <- aov(ln_west_vol[43:126] ~ as.factor(Year[43:126]) * ln_seg_vol[43:126] , data = gi_df_ln)
+Anova(ancova_west_21_22, type="II")
+
+TukeyHSD(ancova_west_21_22, conf.level=0.9)
+
+# 2021/2023
+ancova_west_21_23 <- aov(ln_west_vol[c(43:84, 127:207)] ~ as.factor(Year[c(43:84, 127:207)]) * ln_seg_vol[c(43:84, 127:207)] , data = gi_df_ln)
+Anova(ancova_west_21_23, type="II")
+
+TukeyHSD(ancova_west_21_23, "Year", conf.level=0.9)
+
+# 2022/2023
+ancova_west_22_23 <- aov(ln_west_vol[85:207] ~ as.factor(Year[85:207]) * ln_seg_vol[85:207] , data = gi_df_ln)
+Anova(ancova_west_22_23, type="II")
+
+TukeyHSD(ancova_west_22_23, "Year", conf.level=0.9)
+
+```
+
+ANCOVA Gregory
+```{r}
+# 2020/2021
+ancova_greg_20_21 <- aov(ln_greg_vol[1:84] ~ as.factor(Year[1:84]) * ln_seg_vol[1:84] , data = gi_df_ln)
+Anova(ancova_greg_20_21, type="III")
+
+# anova_greg_20_21 <- aov(ln_greg_vol[1:84] ~ as.factor(Year[1:84]), data = gi_df_ln)
+# summary(anova_greg_20_21)
+
+TukeyHSD(ancova_greg_20_21, conf.level=0.9)
+
+# 2020/2022
+ancova_greg_20_22 <- aov(ln_greg_vol[c(1:42, 85:126)] ~ as.factor(Year[c(1:42, 85:126)]) * ln_seg_vol[c(1:42, 85:126)] , data = gi_df_ln)
+Anova(ancova_greg_20_22, type="II")
+
+TukeyHSD(ancova_greg_20_22, conf.level=0.9)
+
+# 2020/2023
+ancova_greg_20_23 <- aov(ln_greg_vol[c(1:42, 127:207)] ~ as.factor(Year[c(1:42, 127:207)]) * ln_seg_vol[c(1:42, 127:207)] , data = gi_df_ln)
+Anova(ancova_greg_20_23, type="II")
+
+TukeyHSD(ancova_greg_20_23, "Year", conf.level=0.9)
+
+# 2021/2022
+ancova_greg_21_22 <- aov(ln_greg_vol[43:126] ~ as.factor(Year[43:126]) * ln_seg_vol[43:126] , data = gi_df_ln)
+Anova(ancova_greg_21_22, type="II")
+
+TukeyHSD(ancova_greg_21_22, conf.level=0.9)
+
+# 2021/2023
+ancova_greg_21_23 <- aov(ln_greg_vol[c(43:84, 127:207)] ~ as.factor(Year[c(43:84, 127:207)]) * ln_seg_vol[c(43:84, 127:207)] , data = gi_df_ln)
+Anova(ancova_greg_21_23, type="II")
+
+TukeyHSD(ancova_greg_21_23, "Year", conf.level=0.9)
+
+# 2022/2023
+ancova_greg_22_23 <- aov(ln_greg_vol[85:207] ~ as.factor(Year[85:207]) * ln_seg_vol[85:207] , data = gi_df_ln)
+Anova(ancova_greg_22_23, type="II")
+
+TukeyHSD(ancova_greg_22_23, "Year", conf.level=0.9)
+
+```
+
+Create data frame (table) of results
+```{r}
+# Columns needed: Test Site, Year Comparison, Slope p value, Slope significant?, Intercept p value, Intercept significant, % Change
+
+year_comps <- c("2020 vs 2021", "2020 vs 2022", "2020 vs 2023", "2021 vs 2022", "2021 vs 2023", "2022 vs 2023")
+```
+
